@@ -45,6 +45,25 @@ namespace Robust.Client.UserInterface.Controls
 
         public bool ScrollFollowing { get; set; } = true;
 
+        /// <summary>
+        ///     When enabled, wrapped lines within an entry use the output panel's base font height instead of the
+        ///     currently active rich text font height.
+        /// </summary>
+        public bool UseDefaultLineHeight
+        {
+            get => _useDefaultLineHeight;
+            set
+            {
+                if (_useDefaultLineHeight == value)
+                    return;
+
+                _useDefaultLineHeight = value;
+                _invalidateEntries();
+            }
+        }
+
+        private bool _useDefaultLineHeight;
+
         private bool _invalidOnVisible;
 
         public OutputPanel()
@@ -145,7 +164,7 @@ namespace Robust.Client.UserInterface.Controls
         {
             var entry = new RichTextEntry(message, this, _tagManager, tagsAllowed, defaultColor);
 
-            entry.Update(_tagManager, _getFont(), _getContentBox().Width, UIScale);
+            entry.Update(_tagManager, _getFont(), _getContentBox().Width, UIScale, useDefaultLineHeight: UseDefaultLineHeight);
 
             _entries.Add(entry);
             var font = _getFont();
@@ -172,7 +191,7 @@ namespace Robust.Client.UserInterface.Controls
             _scrollBar.MaxValue = Math.Max(_scrollBar.Page, _totalContentHeight);
 
             var entry = new RichTextEntry(message, this, _tagManager, tagsAllowed, defaultColor);
-            entry.Update(_tagManager, _getFont(), _getContentBox().Width, UIScale);
+            entry.Update(_tagManager, _getFont(), _getContentBox().Width, UIScale, useDefaultLineHeight: UseDefaultLineHeight);
             _entries[index] = entry;
 
             AddNewItemHeight(font, in entry);
@@ -242,7 +261,8 @@ namespace Robust.Client.UserInterface.Controls
                     continue;
                 }
 
-                entry.Draw(_tagManager, handle, font, contentBox, entryOffset, context, UIScale);
+                entry.Draw(_tagManager, handle, font, contentBox, entryOffset, context, UIScale,
+                    useDefaultLineHeight: UseDefaultLineHeight);
 
                 entryOffset += entry.Height + lineSeparation;
             }
@@ -283,7 +303,7 @@ namespace Robust.Client.UserInterface.Controls
             var sizeX = _getContentBox().Width;
             foreach (ref var entry in _entries)
             {
-                entry.Update(_tagManager, font, sizeX, UIScale);
+                entry.Update(_tagManager, font, sizeX, UIScale, useDefaultLineHeight: UseDefaultLineHeight);
                 _totalContentHeight += entry.Height + font.GetLineSeparation(UIScale);
             }
 

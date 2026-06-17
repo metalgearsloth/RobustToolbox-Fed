@@ -122,7 +122,8 @@ namespace Robust.Client.UserInterface
         /// <param name="maxSizeX">The maximum horizontal size of the container of this entry.</param>
         /// <param name="uiScale"></param>
         /// <param name="lineHeightScale"></param>
-        public RichTextEntry Update(MarkupTagManager tagManager, Font defaultFont, float maxSizeX, float uiScale, float lineHeightScale = 1)
+        /// <param name="useDefaultLineHeight"></param>
+        public RichTextEntry Update(MarkupTagManager tagManager, Font defaultFont, float maxSizeX, float uiScale, float lineHeightScale = 1, bool useDefaultLineHeight = false)
         {
             // This method is gonna suck due to complexity.
             // Bear with me here.
@@ -209,7 +210,7 @@ namespace Robust.Client.UserInterface
                     if (!context.Font.TryPeek(out var font))
                         font = defaultFont;
 
-                    src.Height += GetLineHeight(font, uiScale, lineHeightScale);
+                    src.Height += GetLineHeight(useDefaultLineHeight ? defaultFont : font, uiScale, lineHeightScale);
                 }
             }
         }
@@ -233,7 +234,8 @@ namespace Robust.Client.UserInterface
             float verticalOffset,
             MarkupDrawingContext context,
             float uiScale,
-            float lineHeightScale = 1)
+            float lineHeightScale = 1,
+            bool useDefaultLineHeight = false)
         {
             context.Clear();
             context.Color.Push(_defaultColor);
@@ -264,7 +266,8 @@ namespace Robust.Client.UserInterface
                     if (lineBreakIndex < LineBreaks.Count &&
                         LineBreaks[lineBreakIndex] == globalBreakCounter)
                     {
-                        baseLine = new Vector2(drawBox.Left, baseLine.Y + GetLineHeight(font, uiScale, lineHeightScale) + controlYAdvance);
+                        baseLine = new Vector2(drawBox.Left,
+                            baseLine.Y + GetLineHeight(useDefaultLineHeight ? defaultFont : font, uiScale, lineHeightScale) + controlYAdvance);
                         controlYAdvance = 0;
                         lineBreakIndex += 1;
 
@@ -298,7 +301,8 @@ namespace Robust.Client.UserInterface
                     control.DesiredSize.Y
                 ));
                 var advanceX = control.DesiredPixelSize.X;
-                controlYAdvance = Math.Max(0f, (control.DesiredPixelSize.Y - GetLineHeight(font, uiScale, lineHeightScale)) * invertedScale);
+                controlYAdvance = Math.Max(0f,
+                    (control.DesiredPixelSize.Y - GetLineHeight(useDefaultLineHeight ? defaultFont : font, uiScale, lineHeightScale)) * invertedScale);
                 baseLine += new Vector2(advanceX, 0);
             }
         }
