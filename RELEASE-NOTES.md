@@ -51,7 +51,7 @@ END TEMPLATE-->
 
 ### Internal
 
-*None yet*
+* Significantly reduce per-frame allocations on debug for the client.
 
 
 ## 277.1.0
