@@ -506,6 +506,11 @@ internal sealed partial class MidiRenderer : IMidiRenderer
         lock (_playerStateLock)
         {
             _synth.SystemReset();
+            var pitchBend = state.PitchBend.AsSpan;
+            var channelPressure = state.ChannelPressure.AsSpan;
+            var controllers = state.Controllers.AsSpan;
+            var programs = state.Program.AsSpan;
+            var noteVelocities = state.NoteVelocities.AsSpan;
 
             for (var channel = 0; channel < ChannelCount; channel++)
             {
@@ -514,12 +519,13 @@ internal sealed partial class MidiRenderer : IMidiRenderer
 
                 _synth.AllNotesOff(channel);
 
-                _synth.PitchBend(channel, state.PitchBend.AsSpan[channel]);
-                _synth.ChannelPressure(channel, state.ChannelPressure.AsSpan[channel]);
+                _synth.PitchBend(channel, pitchBend[channel]);
+                _synth.ChannelPressure(channel, channelPressure[channel]);
 
-                for (var controller = 0; controller < state.Controllers.AsSpan[channel].AsSpan.Length; controller++)
+                var channelControllers = controllers[channel].AsSpan;
+                for (var controller = 0; controller < channelControllers.Length; controller++)
                 {
-                    var value = state.Controllers.AsSpan[channel].AsSpan[controller];
+                    var value = channelControllers[controller];
 
                     if (value == _synth.GetCC(channel, controller))
                         continue;
@@ -534,12 +540,13 @@ internal sealed partial class MidiRenderer : IMidiRenderer
                     }
                 }
 
-                var program = DisableProgramChangeEvent ? MidiProgram : state.Program.AsSpan[channel];
+                var program = DisableProgramChangeEvent ? MidiProgram : programs[channel];
                 _synth.ProgramChange(channel, program);
 
-                for (var key = 0; key < state.NoteVelocities.AsSpan[channel].AsSpan.Length; key++)
+                var channelNoteVelocities = noteVelocities[channel].AsSpan;
+                for (var key = 0; key < channelNoteVelocities.Length; key++)
                 {
-                    var velocity = state.NoteVelocities.AsSpan[channel].AsSpan[key];
+                    var velocity = channelNoteVelocities[key];
 
                     if (velocity <= 0)
                         continue;
@@ -567,12 +574,14 @@ internal sealed partial class MidiRenderer : IMidiRenderer
         {
             lock(_playerStateLock)
             {
+                var channel = midiEvent.Channel;
+
                 // Use MidiCommand as it's more readable with switch statements.
                 switch (midiEvent.MidiCommand)
                 {
                     case RobustMidiCommand.NoteOff:
-                        _rendererState.NoteVelocities.AsSpan[midiEvent.Channel].AsSpan[midiEvent.Key] = 0;
-                        _synth.TryNoteOff(midiEvent.Channel, midiEvent.Key);
+                        _rendererState.NoteVelocities.AsSpan[channel].AsSpan[midiEvent.Key] = 0;
+                        _synth.TryNoteOff(channel, midiEvent.Key);
 
                         break;
                     case RobustMidiCommand.NoteOn:
@@ -580,13 +589,13 @@ internal sealed partial class MidiRenderer : IMidiRenderer
                         var velocity = midiEvent.Velocity;
                         if (velocity == 0)
                         {
-                            _rendererState.NoteVelocities.AsSpan[midiEvent.Channel].AsSpan[midiEvent.Key] = 0;
-                            _synth.TryNoteOn(midiEvent.Channel, midiEvent.Key, velocity);
+                            _rendererState.NoteVelocities.AsSpan[channel].AsSpan[midiEvent.Key] = 0;
+                            _synth.TryNoteOn(channel, midiEvent.Key, velocity);
 
                             break;
                         }
 
-                        if (FilteredChannels[midiEvent.Channel])
+                        if (FilteredChannels[channel])
                             break;
 
                         if (MinVolume > 0)
@@ -594,13 +603,13 @@ internal sealed partial class MidiRenderer : IMidiRenderer
 
                         velocity = VelocityOverride ?? velocity;
 
-                        _rendererState.NoteVelocities.AsSpan[midiEvent.Channel].AsSpan[midiEvent.Key] = velocity;
-                        _synth.TryNoteOn(midiEvent.Channel, midiEvent.Key, velocity);
+                        _rendererState.NoteVelocities.AsSpan[channel].AsSpan[midiEvent.Key] = velocity;
+                        _synth.TryNoteOn(channel, midiEvent.Key, velocity);
 
                         break;
                     case RobustMidiCommand.AfterTouch:
-                        _rendererState.NoteVelocities.AsSpan[midiEvent.Channel].AsSpan[midiEvent.Key] = midiEvent.Value;
-                        _synth.KeyPressure(midiEvent.Channel, midiEvent.Key, midiEvent.Value);
+                        _rendererState.NoteVelocities.AsSpan[channel].AsSpan[midiEvent.Key] = midiEvent.Value;
+                        _synth.KeyPressure(channel, midiEvent.Key, midiEvent.Value);
                         break;
 
                     case RobustMidiCommand.ControlChange:
@@ -608,29 +617,29 @@ internal sealed partial class MidiRenderer : IMidiRenderer
                         if (midiEvent.Control == 0x0 && DisableProgramChangeEvent)
                             break;
 
-                        _rendererState.Controllers.AsSpan[midiEvent.Channel].AsSpan[midiEvent.Control] = midiEvent.Value;
+                        _rendererState.Controllers.AsSpan[channel].AsSpan[midiEvent.Control] = midiEvent.Value;
                         if(midiEvent.Control != 0x0)
-                            _synth.CC(midiEvent.Channel, midiEvent.Control, midiEvent.Value);
+                            _synth.CC(channel, midiEvent.Control, midiEvent.Value);
                         else // Fluidsynth doesn't seem to respect CC0 as bank selection, so we have to do it manually.
-                            _synth.BankSelect(midiEvent.Channel, midiEvent.Value);
+                            _synth.BankSelect(channel, midiEvent.Value);
                         break;
 
                     case RobustMidiCommand.ProgramChange:
                         if (DisableProgramChangeEvent)
                             break;
 
-                        _rendererState.Program.AsSpan[midiEvent.Channel] = midiEvent.Program;
-                        _synth.ProgramChange(midiEvent.Channel, midiEvent.Program);
+                        _rendererState.Program.AsSpan[channel] = midiEvent.Program;
+                        _synth.ProgramChange(channel, midiEvent.Program);
                         break;
 
                     case RobustMidiCommand.ChannelPressure:
-                        _rendererState.ChannelPressure.AsSpan[midiEvent.Channel] = midiEvent.Pressure;
-                        _synth.ChannelPressure(midiEvent.Channel, midiEvent.Pressure);
+                        _rendererState.ChannelPressure.AsSpan[channel] = midiEvent.Pressure;
+                        _synth.ChannelPressure(channel, midiEvent.Pressure);
                         break;
 
                     case RobustMidiCommand.PitchBend:
-                        _rendererState.PitchBend.AsSpan[midiEvent.Channel] = (ushort)midiEvent.Pitch;
-                        _synth.PitchBend(midiEvent.Channel, midiEvent.Pitch);
+                        _rendererState.PitchBend.AsSpan[channel] = (ushort)midiEvent.Pitch;
+                        _synth.PitchBend(channel, midiEvent.Pitch);
                         break;
 
                     // Sometimes MIDI files spam these for no good reason and I can't find any info on what they are.

@@ -58,6 +58,7 @@ END TEMPLATE-->
 * Simplify and optimise Box2.Contains(Vector2)
 * Optimise ComponentRegistry deserialization slightly.
 * Optimise Box2Rotated.TransformBox slightly.
+* Move some MidiRenderer variables outside of a hot loop.
 
 
 ## 277.1.0
